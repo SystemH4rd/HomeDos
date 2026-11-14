@@ -3,6 +3,7 @@
   'use strict';
   const MAX_PIXELS = 12000000, MAX_SIDE = 8192;
   let api, canvas, panel, selectionBox, openButton;
+  let rendererPromise = null;
   let active = false, busy = false, area = null, drag = null, boardId = null, generation = 0;
   const pdfIcon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8m-8 4h6"/></svg>';
 
@@ -157,6 +158,32 @@
     });
     stage.append(copy); document.body.append(stage); return stage;
   }
+  function loadRenderer() {
+    if (typeof global.html2canvas === 'function') return Promise.resolve(global.html2canvas);
+    if (rendererPromise) return rendererPromise;
+    rendererPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.async = true;
+      script.dataset.orbitPdfRenderer = 'true';
+      script.src = new URL('vendor/html2canvas-1.4.1.min.js', document.baseURI).href;
+      let timer;
+      const cleanup = () => { global.clearTimeout(timer); script.onload = null; script.onerror = null; };
+      const fail = () => {
+        cleanup(); script.remove(); rendererPromise = null;
+        reject(new Error('Не вдалося завантажити модуль PDF. Перевірте з’єднання та спробуйте ще раз.'));
+      };
+      script.onload = () => {
+        if (typeof global.html2canvas !== 'function') { fail(); return; }
+        cleanup(); resolve(global.html2canvas);
+      };
+      script.onerror = fail;
+      timer = global.setTimeout(fail, 15000);
+      try { document.head.append(script); } catch { fail(); }
+    });
+    const attempt = rendererPromise;
+    attempt.catch(() => { if (rendererPromise === attempt) rendererPromise = null; });
+    return attempt;
+  }
   async function saveArea(rect) {
     if (busy || !rect) return;
     let stage;
@@ -164,13 +191,15 @@
     try {
       const scale = exportScale(rect);
       if (!board.nodes.some(node => intersects(rect, nodeBounds(node)))) { notify('У фрагменті немає блоків. Оберіть ділянку з вмістом.'); return; }
-      if (typeof global.html2canvas !== 'function') throw new Error('Модуль PDF не завантажився. Перезавантажте сторінку.');
       busy = true;
       panel.querySelectorAll('button').forEach(button => button.disabled = true);
+      panel.querySelector('.pdf-area-status').textContent = typeof global.html2canvas === 'function' ? 'Створюємо PDF…' : 'Завантажуємо модуль PDF…';
+      const renderer = await loadRenderer();
+      if (generation !== exportGeneration) return;
       panel.querySelector('.pdf-area-status').textContent = 'Створюємо PDF…';
       stage = makeStage(rect);
       await Promise.race([document.fonts?.ready || Promise.resolve(), new Promise(resolve => setTimeout(resolve, 1200))]);
-      const image = await global.html2canvas(stage, { backgroundColor: '#ffffff', scale, logging: false, useCORS: false, allowTaint: false, imageTimeout: 5000, scrollX: 0, scrollY: 0, width: rect.width, height: rect.height, onclone: doc => { doc.body.dataset.theme = 'light'; } });
+      const image = await renderer(stage, { backgroundColor: '#ffffff', scale, logging: false, useCORS: false, allowTaint: false, imageTimeout: 5000, scrollX: 0, scrollY: 0, width: rect.width, height: rect.height, onclone: doc => { doc.body.dataset.theme = 'light'; } });
       if (generation !== exportGeneration) return;
       const bytes = createPDF(dataURLBytes(image.toDataURL('image/jpeg', 0.94)), image.width, image.height);
       const name = (title || 'Дошка').replace(/[^\p{L}\p{N}_-]/gu, '_').slice(0, 80);

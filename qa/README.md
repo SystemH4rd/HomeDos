@@ -19,3 +19,11 @@ NODE_PATH=/tmp/orbit-qa/node_modules node qa/pdf-check.cjs
 ```
 
 The PDF check also uses Python Pillow, pypdf and PyMuPDF (`fitz`), plus DejaVu Sans, to parse and rasterize a sample PDF. It checks geometry, crop preparation, UI interactions and PDF structure; actual browser/html2canvas visual rendering remains unverified. Authentication tests use a mocked Supabase SDK and send no real emails. Live registration requires the project configuration described in [AUTH_SETUP.md](../AUTH_SETUP.md).
+
+Responsive interaction checks:
+
+```sh
+NODE_PATH=/tmp/orbit-qa/node_modules node qa/responsive-check.cjs
+```
+
+These use simulated viewport widths (320, 375, 768, 1024 and 1280), touch events and keyboard resizing. They check behavior and accessibility state, not browser layout or physical device rendering.

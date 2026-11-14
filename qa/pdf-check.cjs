@@ -35,10 +35,20 @@ await w.OrbitPDF.saveArea({x:50,y:50,width:100,height:100});assert(downloaded,me
 const bytes=await new Promise((resolve,reject)=>{const reader=new w.FileReader();reader.onload=()=>resolve(Buffer.from(reader.result));reader.onerror=reject;reader.readAsArrayBuffer(downloaded.blob);});
 const out=path.join(temporary,'export.pdf');fs.writeFileSync(out,bytes);
 cp.execFileSync('python',['-c',"import fitz,sys; from pypdf import PdfReader; p=sys.argv[1]; r=PdfReader(p); assert len(r.pages)==1; assert len(r.pages[0].images)==1; d=fitz.open(p); pix=d[0].get_pixmap(); assert pix.width>500 and pix.height>500; assert len(set(pix.samples))>10; assert abs(d[0].rect.width-595.28)<1; print('PDF parser and raster render passed')",out],{stdio:'inherit'});
+// Renderer is loaded from this site's subpath only on first export, and errors allow retry.
+const rendererMock=w.html2canvas;
+delete w.html2canvas;
+const failedLoad=w.OrbitPDF.saveArea({x:50,y:50,width:100,height:100});
+let script=document.querySelector('script[data-orbit-pdf-renderer]');assert(script);assert.equal(script.src,'https://example.test/HomeDos/vendor/html2canvas-1.4.1.min.js');
+assert(document.getElementById('pdf-save-area').disabled);assert.equal(document.querySelectorAll('script[data-orbit-pdf-renderer]').length,1);
+script.dispatchEvent(new w.Event('error'));await failedLoad;assert(!document.querySelector('script[data-orbit-pdf-renderer]'));assert(!document.getElementById('pdf-save-area').disabled);assert(messages.at(-1).includes('спробуйте ще раз'));
+const retryLoad=w.OrbitPDF.saveArea({x:50,y:50,width:100,height:100});
+script=document.querySelector('script[data-orbit-pdf-renderer]');assert(script);w.html2canvas=rendererMock;script.dispatchEvent(new w.Event('load'));await retryLoad;assert(!renderedStage.isConnected);assert(downloaded);
+const loadedScript=script;delete w.html2canvas;await w.OrbitPDF.saveArea({x:50,y:50,width:100,height:100});assert.equal(document.querySelectorAll('script[data-orbit-pdf-renderer]').length,1);assert.equal(document.querySelector('script[data-orbit-pdf-renderer]'),loadedScript);
 current={...current,id:'other'};document.dispatchEvent(new w.Event('orbit:render'));assert(document.querySelector('.pdf-panel').hidden);
 w.OrbitPDF.begin();document.dispatchEvent(new w.Event('orbit:profile'));assert(document.querySelector('.pdf-panel').hidden);
 w.OrbitPDF.begin();const escape=new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true});w.dispatchEvent(escape);assert(document.querySelector('.pdf-panel').hidden);
 assert.equal(consoleErrors.length,0,consoleErrors.map(x=>x.message).join('\n'));
-console.log('PASS: selection geometry, capture prevents dragging, zoom mapping, exact region clone, Ukrainian content, SVG viewBox, PDF bytes/parser/render, board-change clearing, Escape.');
+console.log('PASS: selection geometry, capture prevents dragging, zoom mapping, exact region clone, Ukrainian content, SVG viewBox, PDF bytes/parser/render, lazy local renderer loading, error cleanup/retry/cache, board-change clearing, Escape.');
 dom.window.close();fs.rmSync(temporary,{recursive:true,force:true});
 })().catch(error=>{console.error(error);dom.window.close();process.exitCode=1;});

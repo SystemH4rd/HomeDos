@@ -63,7 +63,7 @@ function render(){
  updateProfile();
 }
 function setMode(next,clear=true){mode=next;$('#auth-password').value='';$('#auth-confirm').value='';if(clear)message('');render();}
-function open(next){setMode(next||(currentUser?'account':'login'));if(!dialog.open)dialog.showModal();if(configured)setTimeout(()=>{const input=mode==='reset'?$('#auth-password'):$('#auth-email');if(!input.disabled)input.focus();},0);}
+function open(next){api.closeNavigation?.();setMode(next||(currentUser?'account':'login'));if(!dialog.open)dialog.showModal();if(configured)setTimeout(()=>{const input=mode==='reset'?$('#auth-password'):$('#auth-email');if(!input.disabled)input.focus();},0);}
 function clearPasswords(){$('#auth-password').value='';$('#auth-confirm').value='';}
 function dismiss(){dialog.close();clearPasswords();}
 openButton.onclick=()=>open();$('#auth-close').onclick=$('#auth-dismiss').onclick=dismiss;
@@ -104,10 +104,26 @@ $('#auth-form').addEventListener('submit',async e=>{
  }catch(error){message(describeError(error),'error');}finally{busy=false;render();}
 });
 $('#auth-logout').onclick=async()=>{if(busy||!client)return;busy=true;render();try{const {error}=await client.auth.signOut({scope:'local'});if(error)throw error;++validationTicket;await applyUser(null,'SIGNED_OUT');dismiss();api.notify('Ви вийшли. Відкрито гостьові дошки.');}catch(error){message(describeError(error),'error');}finally{busy=false;render();}};
+let sdkLoadPromise=null;
+function loadSupabase(){
+ if(window.supabase?.createClient)return Promise.resolve();
+ if(sdkLoadPromise)return sdkLoadPromise;
+ sdkLoadPromise=new Promise((resolve,reject)=>{
+  const script=document.createElement('script');script.async=true;script.src=new URL('vendor/supabase.js',document.baseURI).href;script.dataset.orbitAuthSdk='';
+  const finish=(error)=>{clearTimeout(timeout);script.onload=null;script.onerror=null;if(error){script.remove();reject(error);}else resolve();};
+  const timeout=setTimeout(()=>finish(Error('sdk_timeout')),15000);
+  script.onload=()=>finish(window.supabase?.createClient?null:Error('sdk_invalid'));
+  script.onerror=()=>finish(Error('sdk_load_failed'));
+  document.head.append(script);
+ });
+ return sdkLoadPromise;
+}
 async function initialize(){
  let config;try{config=publicConfig(window.ORBIT_AUTH_CONFIG);}catch{configurationError='Реєстрація ще не налаштована: помилка підключення сервісу. Дошкою можна користуватися без входу.';render();return;}
  if(!config){render();return;}
- if(!window.supabase?.createClient){configurationError='Сервіс облікових записів не завантажився. Оновіть сторінку або спробуйте пізніше.';render();return;}
+ configurationError='Завантаження сервісу облікових записів…';render();
+ try{await loadSupabase();}catch{configurationError='Сервіс облікових записів не завантажився. Оновіть сторінку, щоб спробувати ще раз. Дошкою можна користуватися без входу.';configured=false;render();return;}
+ configurationError='';
  try{
   client=window.supabase.createClient(config.url,config.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce',storageKey:'orbit.supabase.auth.'+new URL(config.url).hostname}});configured=true;
   client.auth.onAuthStateChange((event,session)=>{if(event==='INITIAL_SESSION')return;setTimeout(()=>verifySession(session,event).catch(()=>{if(dialog.open)message('Не вдалося відновити вхід. Спробуйте увійти ще раз.','error');}),0);});
