@@ -22,3 +22,5 @@ dialog.search-panel{margin:0;max-height:calc(100dvh - 130px)}.search-panel .sear
 /* Keep backup access and readable navigation on narrow devices. */
 .breadcrumbs{min-width:0}.breadcrumbs strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.node-connector:after{content:'';position:absolute;inset:-8px;border-radius:50%}.board-item small{font:10px 'IBM Plex Mono',monospace;color:var(--muted)}
 @media(max-width:680px){.top-actions>#export-board{display:inline-flex;width:28px;padding:5px;font-size:0}.breadcrumbs>span:not(.crumb-slash){display:none}.breadcrumbs .crumb-slash{display:none}.topbar .breadcrumbs{max-width:130px}.canvas-toolbar{max-width:calc(100vw - 20px)}}
+/* Account controls remain reachable on short screens. */
+.sidebar{overflow-y:auto}.sidebar-bottom{flex-shrink:0}

@@ -1,0 +1,13 @@
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {JSDOM,VirtualConsole}=require('jsdom'),{indexedDB}=require('fake-indexeddb');
+const root=path.resolve(__dirname,'../docs'),errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e));
+const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'https://systemh4rd.github.io/HomeDos/',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});const w=dom.window,d=w.document;
+w.indexedDB=indexedDB;w.TextEncoder=TextEncoder;w.TextDecoder=TextDecoder;w.HTMLCanvasElement.prototype.getContext=()=>({clearRect(){},fillRect(){},strokeRect(){}});w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false};w.HTMLElement.prototype.setPointerCapture=()=>{};w.HTMLElement.prototype.hasPointerCapture=()=>false;
+const canvas=d.querySelector('#canvas');Object.defineProperties(canvas,{clientWidth:{value:1200},clientHeight:{value:760}});canvas.getBoundingClientRect=()=>({left:0,top:0,width:1200,height:760});Object.defineProperty(w.HTMLElement.prototype,'offsetHeight',{get(){return this.classList.contains('hub')?265:240}});
+for(const script of d.querySelectorAll('script[src]')){const name=script.getAttribute('src').split('?')[0];assert(fs.existsSync(path.join(root,name)),name+' missing');w.eval(fs.readFileSync(path.join(root,name),'utf8'));}
+assert(w.OrbitCanvas);assert(w.OrbitAuth);assert(w.OrbitPDF);assert.equal(w.OrbitAuth.isConfigured(),false);assert.equal(typeof w.supabase.createClient,'function');assert.equal(typeof w.html2canvas,'function');
+d.querySelector('#auth-open').click();assert(d.querySelector('#auth-dialog').open);assert(d.querySelector('#auth-submit').disabled);assert(d.querySelector('#auth-message').textContent.includes('ще не налаштована'));d.querySelector('#auth-close').click();
+d.querySelector('#pdf-export-open').click();assert(!d.querySelector('.pdf-panel').hidden);
+for(const [type,x,y]of [['pointerdown',200,200],['pointermove',400,400],['pointerup',400,400]]){const e=new w.Event(type,{bubbles:true,cancelable:true});Object.assign(e,{clientX:x,clientY:y,pointerId:1,button:0});canvas.dispatchEvent(e);}assert(!d.querySelector('.pdf-selection').hidden);assert(!d.querySelector('#pdf-save-area').disabled);
+w.OrbitCanvas.activateUser('test-profile');assert(d.querySelector('.pdf-panel').hidden);assert(d.querySelector('.pdf-selection').hidden);w.OrbitCanvas.activateUser(null);
+assert.equal(errors.length,0,errors.map(e=>e.message).join('\n'));console.log('PASS: all production scripts load together, missing auth config is explicit, PDF selection and profile-reset hooks work.');dom.window.close();

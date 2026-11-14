@@ -1,0 +1,44 @@
+/* npm install --prefix /tmp/orbit-qa jsdom; NODE_PATH=/tmp/orbit-qa/node_modules node qa/pdf-check.cjs */
+const fs = require('node:fs'), path = require('node:path'), os = require('node:os'), cp = require('node:child_process');
+const assert = require('node:assert/strict');
+const { JSDOM, VirtualConsole } = require('jsdom');
+const root = path.resolve(__dirname, '..'), temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'orbit-pdf-'));
+cp.execFileSync('python', ['-c', "from PIL import Image,ImageDraw,ImageFont; import sys; im=Image.new('RGB',(200,200),'white'); d=ImageDraw.Draw(im); d.rectangle((10,10,190,190),outline='#668855',width=3); d.text((20,85),'Привіт, Україно',font=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',18),fill='black'); im.save(sys.argv[1],'JPEG')", path.join(temporary, 'sample.jpg')]);
+const jpeg = fs.readFileSync(path.join(temporary, 'sample.jpg'));
+const consoleErrors = [], vc = new VirtualConsole(); vc.on('jsdomError', error => consoleErrors.push(error));
+const dom = new JSDOM('<!doctype html><html><body><div class="top-actions"><button id="add-block">Add</button></div><div id="canvas"><div id="world" class="world"><svg class="edges" id="edges" width="1" height="1"><path class="edge-path" d="M0 0L200 200"/></svg><div id="nodes"><article class="node selected" data-id="one" style="left:-20px;top:0"><div class="node-head"><button class="node-actions">Edit</button></div><div class="node-body">Привіт, Україно<input type="checkbox" checked></div></article><article class="node" data-id="two" style="left:300px;top:0">Друга нотатка</article></div></div></div></body></html>', { url: 'https://example.test/HomeDos/', runScripts: 'outside-only', pretendToBeVisual: true, virtualConsole: vc });
+const w = dom.window, document = w.document;
+w.TextEncoder = TextEncoder;
+const canvas = document.getElementById('canvas');
+Object.defineProperties(canvas, { clientWidth: {value:800}, clientHeight: {value:600} });
+canvas.getBoundingClientRect = () => ({left:0,top:0,width:800,height:600});
+canvas.setPointerCapture = () => {}; canvas.hasPointerCapture = () => false;
+let view={x:100,y:50,z:2}, current={id:'project',name:'Мій проєкт',nodes:[{id:'one',x:-20,y:0},{id:'two',x:300,y:0}]};
+const messages = [];let downloaded=null, renderedStage=null, pan=0;
+canvas.addEventListener('pointerdown',()=>pan++);
+w.OrbitCanvas = { getBoard:()=>current,getView:()=>view,getNodeElement:id=>document.querySelector(`[data-id="${id}"]`),notify:message=>messages.push(message),download:(blob,name)=>{downloaded={blob,name}} };
+w.html2canvas = async (stage,options) => { renderedStage=stage; assert.equal(stage.querySelector('#nodes'),null);assert(!stage.querySelector('.selected'));assert(!stage.querySelector('input'));assert(stage.textContent.includes('Привіт, Україно'));assert.equal(stage.querySelector('.pdf-edges').getAttribute('viewBox'),'50 50 100 100');assert.equal(stage.querySelector('.pdf-edges').getAttribute('width'),'100');assert.equal(stage.querySelector('.pdf-edges path').getAttribute('stroke'),'#819776');assert.equal(stage.querySelector('.world').style.left,'-50px');assert(options.scale<=2);return {width:200,height:200,toDataURL:()=>`data:image/jpeg;base64,${jpeg.toString('base64')}`}; };
+w.eval(fs.readFileSync(path.join(root,'docs/pdf-export.js'),'utf8'));
+const utils=w.OrbitPDF.utils;
+assert.deepEqual(JSON.parse(JSON.stringify(utils.normalizedRect({x:9,y:-2},{x:-5,y:8}))),{x:-5,y:-2,width:14,height:10});
+assert.deepEqual(JSON.parse(JSON.stringify(utils.screenToWorld({x:200,y:150},view))),{x:50,y:50});
+assert(utils.intersects({x:0,y:0,width:10,height:10},{x:-2,y:-2,width:4,height:4}));
+assert(!utils.intersects({x:0,y:0,width:10,height:10},{x:20,y:20,width:4,height:4}));
+const scale=utils.exportScale({x:-20,y:-10,width:9000,height:9000});assert(scale*9000<=8192);assert(scale*scale*9000*9000<=12000001);
+assert.throws(()=>utils.exportScale({x:0,y:0,width:Infinity,height:10}));
+function pointer(type,x,y){const event=new w.Event(type,{bubbles:true,cancelable:true});Object.assign(event,{clientX:x,clientY:y,pointerId:1,button:0});document.querySelector('.node-body').dispatchEvent(event);}
+(async()=>{
+document.getElementById('pdf-export-open').click();assert(!document.querySelector('.pdf-panel').hidden);
+pointer('pointerdown',200,150);pointer('pointermove',400,350);pointer('pointerup',400,350);assert.equal(pan,0);assert.equal(document.querySelector('.pdf-selection').style.left,'200px');assert.equal(document.querySelector('.pdf-selection').style.width,'200px');
+view={x:0,y:0,z:1};document.dispatchEvent(new w.Event('orbit:view'));assert.equal(document.querySelector('.pdf-selection').style.left,'50px');assert.equal(document.querySelector('.pdf-selection').style.width,'100px');
+await w.OrbitPDF.saveArea({x:50,y:50,width:100,height:100});assert(downloaded,messages.join("; "));assert.equal(downloaded.blob.type,'application/pdf');assert(downloaded.name.endsWith('_фрагмент.pdf'));assert(!renderedStage.isConnected);
+const bytes=await new Promise((resolve,reject)=>{const reader=new w.FileReader();reader.onload=()=>resolve(Buffer.from(reader.result));reader.onerror=reject;reader.readAsArrayBuffer(downloaded.blob);});
+const out=path.join(temporary,'export.pdf');fs.writeFileSync(out,bytes);
+cp.execFileSync('python',['-c',"import fitz,sys; from pypdf import PdfReader; p=sys.argv[1]; r=PdfReader(p); assert len(r.pages)==1; assert len(r.pages[0].images)==1; d=fitz.open(p); pix=d[0].get_pixmap(); assert pix.width>500 and pix.height>500; assert len(set(pix.samples))>10; assert abs(d[0].rect.width-595.28)<1; print('PDF parser and raster render passed')",out],{stdio:'inherit'});
+current={...current,id:'other'};document.dispatchEvent(new w.Event('orbit:render'));assert(document.querySelector('.pdf-panel').hidden);
+w.OrbitPDF.begin();document.dispatchEvent(new w.Event('orbit:profile'));assert(document.querySelector('.pdf-panel').hidden);
+w.OrbitPDF.begin();const escape=new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true});w.dispatchEvent(escape);assert(document.querySelector('.pdf-panel').hidden);
+assert.equal(consoleErrors.length,0,consoleErrors.map(x=>x.message).join('\n'));
+console.log('PASS: selection geometry, capture prevents dragging, zoom mapping, exact region clone, Ukrainian content, SVG viewBox, PDF bytes/parser/render, board-change clearing, Escape.');
+dom.window.close();fs.rmSync(temporary,{recursive:true,force:true});
+})().catch(error=>{console.error(error);dom.window.close();process.exitCode=1;});

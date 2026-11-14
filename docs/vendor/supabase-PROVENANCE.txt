@@ -1,0 +1,7 @@
+Package: @supabase/supabase-js
+Version: 2.119.0
+Source: https://registry.npmjs.org/@supabase/supabase-js/-/supabase-js-2.119.0.tgz
+Vendored file: package/dist/umd/supabase.js (unchanged)
+SHA-256: a867edbcfb029370aeec7223dd6180b560b621fbe3bc64c6584fb0369d1b7bce
+License: MIT, see supabase-LICENSE.txt
+Repository: https://github.com/supabase/supabase-js
