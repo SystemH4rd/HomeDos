@@ -19,7 +19,7 @@ const submit=s=>q(s).dispatchEvent(new w.Event('submit',{bubbles:true,cancelable
 const wait=()=>new Promise(r=>setTimeout(r,30));
 (async()=>{
 await wait();assert.equal(d.querySelectorAll('.node').length,5);assert.equal(d.querySelectorAll('.edge-path').length,4);
-assert.equal(run('board().name'),'Джарвіс');assert(w.localStorage.getItem('orbit.workspace.v1'));
+assert.equal(run('board().name'),'Мій проєкт');assert(w.localStorage.getItem('orbit.workspace.v1'));
 // Create, edit, delete, undo, content escaping.
 click('#add-block');q('#block-title').value='<img src=x onerror=alert(1)>';q('#block-text').value='Перша думка';submit('#editor-form');await wait();
 assert.equal(d.querySelectorAll('.node').length,6);assert(!q('#nodes img'));assert.equal(run('board().nodes.at(-1).text'),'Перша думка');
@@ -35,7 +35,7 @@ click('#search-open');q('#search-query').value='Оновлено';q('#search-que
 // New board, empty state, rename, switch.
 click('#new-board');q('#board-name').value='Друга дошка';submit('#board-form');assert.equal(run('state.boards.length'),2);assert.equal(run('board().nodes.length'),0);assert(!q('#empty-state').classList.contains('hidden'));
 click('#rename-board');q('#board-name').value='Робоча дошка';submit('#board-form');assert.equal(q('#board-title').textContent,'Робоча дошка');
-run("switchBoard('jarvis')");await wait();assert.equal(run('board().nodes.length'),6);
+run("switchBoard('project')");await wait();assert.equal(run('board().nodes.length'),6);
 // Link URL rejects javascript: and valid links are safe.
 assert.equal(run("safeUrl('javascript:alert(1)')"),null);assert.equal(run("safeUrl('https://example.com/')"),'https://example.com/');
 // Theme, responsive drawer, zoom.
@@ -50,7 +50,7 @@ await q('#import-file').onchange({target:{files:[{size:exportText.length,text:as
 assert(run('validWorkspace(JSON.parse(localStorage.getItem(STORAGE)))'));
 assert(Number.isFinite(run('view.z')));
 // IndexedDB persistence including file bytes.
-w.testBlob=new Blob(['Jarvis test file'],{type:'text/plain'});await run("putFile('qa-file',window.testBlob)");const blob=await run("getFile('qa-file')");assert.equal(await blob.text(),'Jarvis test file');
+w.testBlob=new Blob(['Orbit test file'],{type:'text/plain'});await run("putFile('qa-file',window.testBlob)");const blob=await run("getFile('qa-file')");assert.equal(await blob.text(),'Orbit test file');
 assert.equal(errors.length,0,errors.map(e=>e.message).join('\n'));
 console.log('PASS: initial graph, create/edit/delete/undo, XSS escaping, task persistence, connect/disconnect, search, multiple boards, URL checks, theme, mobile menu, zoom, JSON export/import, localStorage validation, IndexedDB file bytes.');
 dom.window.close();

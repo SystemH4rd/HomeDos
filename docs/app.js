@@ -8,15 +8,37 @@ const uid=()=>crypto.randomUUID();
 const typeNames={note:'Нотатка',tasks:'Завдання',link:'Посилання',file:'Файл',hub:'Проєкт'};
 const typeIcons={note:'note',tasks:'checklist',link:'link',file:'file',hub:'orbit'};
 const STORAGE='orbit.workspace.v1';
-function initial(){return {version:1,active:'jarvis',boards:[{id:'jarvis',name:'Джарвіс',nodes:[
-{id:'vision',type:'note',color:'purple',x:0,y:0,title:'Ідея, з якої все починається',text:'Мій особистий голосовий асистент. Завжди поруч, пам’ятає важливе та допомагає з повсякденними справами.\n\nУся обробка й дані — на власному сервері.',tag:'Бачення проєкту'},
-{id:'tasks',type:'tasks',color:'green',x:0,y:305,title:'Від ідеї до першого «Привіт»',tasks:[{text:'Спроєктувати архітектуру',done:true},{text:'Обрати сервер із GPU',done:false},{text:'Порівняти локальні LLM',done:false},{text:'Налаштувати STT і TTS',done:false},{text:'Зібрати голосовий прототип',done:false}]},
-{id:'center',type:'hub',color:'green',x:365,y:155,title:'Джарвіс',text:'Особистий асистент.\nВелика ідея, зібрана докупи.',tag:'МІЙ ГОЛОВНИЙ ПРОЄКТ'},
-{id:'architecture',type:'note',color:'blue',x:730,y:0,title:'Як усе пов’язано',text:'01   API Gateway → автентифікація\n02   Оркестратор → діалоги й задачі\n03   STT → голос у текст\n04   LLM → розуміння й відповідь\n05   TTS → текст у голос\n06   PostgreSQL → пам’ять\n\nWebSocket для реального часу.',tag:'Архітектура'},
-{id:'resources',type:'link',color:'amber',x:730,y:360,title:'Знайти дім для Джарвіса',text:'Конфігурації виділених серверів Cloud2Y. Перевірити можливість додати GPU.',url:'https://cloud2y.com/uk/dedicated-servers',tag:'Інфраструктура'}
+function initial(){return {version:1,active:'project',boards:[{id:'project',name:'Мій проєкт',nodes:[
+{id:'vision',type:'note',color:'purple',x:0,y:0,title:'Ідея, з якої все починається',text:'Зберіть думки, натхнення й важливі деталі в одному місці.\n\nДодайте власні нотатки та поєднайте їх зв’язками — так легше побачити цілісну картину.',tag:'Бачення проєкту'},
+{id:'tasks',type:'tasks',color:'green',x:0,y:305,title:'Від ідеї до першого кроку',tasks:[{text:'Зібрати початкові ідеї',done:true},{text:'Визначити головну мету',done:false},{text:'Розставити пріоритети',done:false},{text:'Додати корисні матеріали',done:false},{text:'Зробити перший крок',done:false}]},
+{id:'center',type:'hub',color:'green',x:365,y:155,title:'Мій проєкт',text:'Ваші ідеї та плани.\nУсе важливе на одному полотні.',tag:'МІЙ ГОЛОВНИЙ ПРОЄКТ'},
+{id:'architecture',type:'note',color:'blue',x:730,y:0,title:'Як організувати простір',text:'01   Запишіть головну ідею\n02   Розкладіть її на завдання\n03   Додайте посилання й файли\n04   Поєднайте пов’язані блоки\n05   Повертайтеся до важливого\n\nДвічі натисніть на блок, щоб змінити його.',tag:'Підказки'},
+{id:'resources',type:'link',color:'amber',x:730,y:360,title:'Корисні матеріали',text:'Зберігайте посилання на документи, джерела й натхнення. Це місце для матеріалів вашого проєкту.',url:'https://uk.wikipedia.org/',tag:'Натхнення'}
 ],edges:[['vision','center'],['tasks','center'],['center','architecture'],['center','resources']]}]};}
+// Update unchanged starter copy while retaining personal edits, task progress and layout.
+function contentHash(value){let hash=2166136261;for(const character of String(value)){hash=Math.imul(hash^character.codePointAt(0),16777619);}return hash>>>0;}
+function migrateStarter(workspace){
+ if(workspace.starterCopyVersion===2)return workspace;
+ const replacements=initial().boards[0];
+ const previous={"vision":{"title":1408491301,"text":59326015,"tag":3165518717},"tasks":{"title":931592881,"tasks":[396897224,4094022544,2858173598,2627709604,3090801533]},"center":{"title":3834280414,"text":3214130468,"tag":2837523609},"architecture":{"title":1887297962,"text":1945146655,"tag":3782278020},"resources":{"title":2513491367,"text":4074832427,"tag":284351595,"url":3330479029}};
+ for(const b of workspace.boards){
+  if(contentHash(b.id)!==1623464004)continue;
+  if(contentHash(b.name)===3834280414)b.name=replacements.name;
+  for(const n of b.nodes){
+   const before=previous[n.id],after=replacements.nodes.find(item=>item.id===n.id);if(!before||!after)continue;
+   for(const key of ['title','text','tag','url'])if(before[key]!==undefined&&contentHash(n[key])===before[key])n[key]=after[key];
+   if(Array.isArray(n.tasks)&&before.tasks)n.tasks.forEach(task=>{const index=before.tasks.indexOf(contentHash(task.text));if(index>=0)task.text=after.tasks[index].text;});
+  }
+  let replacementId='project',suffix=2;while(workspace.boards.some(other=>other!==b&&other.id===replacementId))replacementId='project-'+suffix++;
+  if(workspace.active===b.id)workspace.active=replacementId;b.id=replacementId;
+ }
+ workspace.starterCopyVersion=2;
+ return workspace;
+}
+
 let state;try{const raw=JSON.parse(localStorage.getItem(STORAGE));state=validWorkspace(raw)?raw:initial();}catch{state=initial();}
 function validWorkspace(s){return s&&s.version===1&&Array.isArray(s.boards)&&s.boards.length>0&&s.boards.length<=100&&s.boards.every(b=>b&&typeof b.id==='string'&&typeof b.name==='string'&&Array.isArray(b.nodes)&&b.nodes.length<=1000&&Array.isArray(b.edges)&&b.nodes.every(n=>n&&typeof n.id==='string'&&['note','tasks','link','file','hub'].includes(n.type)&&Number.isFinite(n.x)&&Number.isFinite(n.y)&&Math.abs(n.x)<1e7&&Math.abs(n.y)<1e7&&typeof n.title==='string'&&n.title.length<=200&&(!n.text||typeof n.text==='string')&&(n.type!=='tasks'||Array.isArray(n.tasks)&&n.tasks.every(t=>typeof t.text==='string'&&typeof t.done==='boolean')))&&b.edges.every(e=>Array.isArray(e)&&e.length===2&&e.every(i=>typeof i==='string')));}
+migrateStarter(state);
 if(!state.boards.some(b=>b.id===state.active))state.active=state.boards[0].id;
 let view={x:0,y:0,z:1},tool='select',selected=null,source=null,editing=null,editorColor='green',boardMode='new',toastTimer,history=[],gesture=null,space=false;
 const board=()=>state.boards.find(b=>b.id===state.active);
