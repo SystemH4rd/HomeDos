@@ -14,6 +14,7 @@ Feature checks with the same jsdom/fake-indexeddb dependencies:
 ```sh
 NODE_PATH=/tmp/orbit-qa/node_modules node qa/accounts-check.cjs
 NODE_PATH=/tmp/orbit-qa/node_modules node qa/auth-check.cjs
+NODE_PATH=/tmp/orbit-qa/node_modules node qa/sync-check.cjs
 NODE_PATH=/tmp/orbit-qa/node_modules node qa/integration-check.cjs
 NODE_PATH=/tmp/orbit-qa/node_modules node qa/pdf-check.cjs
 ```
@@ -27,3 +28,12 @@ NODE_PATH=/tmp/orbit-qa/node_modules node qa/responsive-check.cjs
 ```
 
 These use simulated viewport widths (320, 375, 768, 1024 and 1280), touch events and keyboard resizing. They check behavior and accessibility state, not browser layout or physical device rendering.
+
+Cloud sync checks use a mocked Supabase client: create/load/save, attachments, offline retries, conflict protection and account switching. Live Auth, SQL/RLS and Storage need a configured Supabase project and must be verified using AUTH_SETUP.md.
+
+SQL/RLS checks run against PostgreSQL in PGlite with minimal Auth/Storage fixtures (no live project):
+
+```sh
+npm install --prefix /tmp/orbit-qa @electric-sql/pglite --no-audit --no-fund
+NODE_PATH=/tmp/orbit-qa/node_modules node qa/cloud-schema-check.cjs
+```

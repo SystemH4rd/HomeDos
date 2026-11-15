@@ -1,0 +1,30 @@
+// Real PostgreSQL semantics in PGlite; auth/storage service schemas are minimal fixtures.
+const {PGlite}=require('@electric-sql/pglite'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+(async()=>{
+ const db=new PGlite();
+ await db.exec(`create role anon;create role authenticated;
+ create schema auth;create table auth.users(id uuid primary key);
+ create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+ grant usage on schema auth,public to authenticated,anon;grant execute on function auth.uid() to authenticated,anon;
+ create schema storage;create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint);
+ create table storage.objects(bucket_id text,name text);alter table storage.objects enable row level security;
+ create function storage.foldername(text) returns text[] language sql immutable as $$select string_to_array($1,'/')$$;
+ grant usage on schema storage to authenticated;grant select,insert,update,delete on storage.objects to authenticated;
+ insert into auth.users values('11111111-1111-1111-1111-111111111111'),('22222222-2222-2222-2222-222222222222');`);
+ const schema=fs.readFileSync(path.resolve(__dirname,'../supabase/schema.sql'),'utf8');await db.exec(schema);await db.exec(schema);
+ const alice='11111111-1111-1111-1111-111111111111',bob='22222222-2222-2222-2222-222222222222';
+ await db.exec(`set role authenticated;select set_config('request.jwt.claim.sub','${alice}',false);`);
+ const workspace=JSON.stringify({version:1,boards:[{id:'one',name:'Private',nodes:[],edges:[]}]});
+ let result=await db.query('select public.orbit_save_workspace($1::jsonb,0) as revision',[workspace]);assert.equal(Number(result.rows[0].revision),1);
+ await assert.rejects(db.query('select public.orbit_save_workspace($1::jsonb,0)',[workspace]),e=>e.code==='40001');
+ result=await db.query('select public.orbit_save_workspace($1::jsonb,1) as revision',[workspace]);assert.equal(Number(result.rows[0].revision),2);
+ await assert.rejects(db.exec("update public.orbit_workspaces set revision=999"),e=>e.code==='42501');
+ await db.query("insert into storage.objects values('orbit-files',$1)",[alice+'/file']);
+ await assert.rejects(db.query("insert into storage.objects values('orbit-files',$1)",[bob+'/file']),e=>e.code==='42501');
+ await db.exec(`select set_config('request.jwt.claim.sub','${bob}',false)`);
+ assert.equal((await db.query('select * from public.orbit_workspaces')).rows.length,0);assert.equal((await db.query('select * from storage.objects')).rows.length,0);
+ await db.query('select public.orbit_save_workspace($1::jsonb,0)',[workspace]);assert.equal((await db.query('select * from public.orbit_workspaces')).rows.length,1);
+ await db.exec("set role anon;select set_config('request.jwt.claim.sub','',false)");
+ await assert.rejects(db.query('select public.orbit_save_workspace($1::jsonb,0)',[workspace]),e=>e.code==='42501');await assert.rejects(db.query('select * from public.orbit_workspaces'),e=>e.code==='42501');
+ await db.close();console.log('PASS: SQL migration rerun, atomic revision conflicts, denied direct writes, two-user workspace/file RLS, anonymous access denial.');
+})().catch(e=>{console.error(e);process.exitCode=1});
