@@ -72,7 +72,7 @@ dialog.querySelectorAll('[data-auth-mode]').forEach(b=>b.onclick=()=>setMode(b.d
 function applyUser(user,event,ticket=validationTicket){
  scopeQueue=scopeQueue.catch(()=>{}).then(async()=>{
   if(ticket!==validationTicket)return;
-  const nextId=user?.id||null;if(nextId!==scopeUserId){await window.OrbitSync?.disconnect();await api.activateUser(nextId);scopeUserId=nextId;if(nextId)await window.OrbitSync?.connect(client,nextId);}
+  const nextId=user?.id||null;if(nextId!==scopeUserId){await window.OrbitShared?.disconnect();await window.OrbitSync?.disconnect();await api.activateUser(nextId);scopeUserId=nextId;if(nextId){await window.OrbitSync?.connect(client,nextId);await window.OrbitShared?.connect(client,nextId,user?.user_metadata?.display_name||'Учасник');}}
   if(ticket!==validationTicket)return;
   currentUser=user||null;updateProfile();if(event==='PASSWORD_RECOVERY'){open('reset');return;}if(dialog.open){if(currentUser&&mode!=='reset')mode='account';if(!currentUser&&mode==='account')mode='login';render();}
  });

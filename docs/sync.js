@@ -78,7 +78,7 @@ retry.onclick=async()=>{
 window.addEventListener('online',()=>{if(context&&!context.conflict)retry.click();});
 window.addEventListener('beforeunload',e=>{if(context&&(context.dirty||context.running)){e.preventDefault();e.returnValue='';}});
 window.OrbitSync=Object.freeze({connect,disconnect,flush:()=>context?flush(context):Promise.resolve(),downloadFile:async id=>{
- const c=context;if(!c)return null;const {data,error}=await c.client.storage.from('orbit-files').download(path(c,id));if(error)throw error;if(!current(c))return null;await api.putFile(id,data);return data;
+ if(window.OrbitShared?.hasFile(id))return window.OrbitShared.downloadFile(id);const c=context;if(!c)return null;const {data,error}=await c.client.storage.from('orbit-files').download(path(c,id));if(error)throw error;if(!current(c))return null;await api.putFile(id,data);return data;
 }});
 label.textContent='Без входу — збереження на пристрої';
 })();

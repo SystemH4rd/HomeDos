@@ -1,0 +1,3 @@
+.shared-banner{position:absolute;left:24px;right:24px;top:115px;z-index:3;display:flex;gap:14px;align-items:center;padding:9px 13px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--muted);font-size:11px;line-height:1.5}.shared-banner[hidden]{display:none}.shared-banner .text-link{white-space:nowrap;margin-left:auto}.shared-author{display:block;font-size:10px;color:var(--muted);margin-bottom:9px;overflow-wrap:anywhere}#shared-board-open{margin-top:8px;border:1px solid var(--line)}#shared-board-open[hidden]{display:none}@media(max-width:680px){.shared-banner{left:12px;right:12px;top:105px;font-size:10px;flex-wrap:wrap;gap:5px}.shared-banner .text-link{margin-left:0}}
+
+.shared-active .node-connector{display:none}
