@@ -37,3 +37,14 @@ SQL/RLS checks run against PostgreSQL in PGlite with minimal Auth/Storage fixtur
 npm install --prefix /tmp/orbit-qa @electric-sql/pglite --no-audit --no-fund
 NODE_PATH=/tmp/orbit-qa/node_modules node qa/cloud-schema-check.cjs
 ```
+
+## Attachment viewer in Chromium
+
+Serve `docs/` locally, then run the Playwright test with Chromium installed:
+
+```sh
+python3 -m http.server 8765 --bind 127.0.0.1 --directory docs
+node qa/file-viewer-browser.cjs
+```
+
+The test overrides Auth configuration and uses generated fixtures only. It checks visible images/zoom, Word text, Excel sheets, CSV quoting, inert HTML, corrupt-file downloads, PDF/media elements, unsupported formats, profile cleanup and a 375px mobile dialog. Screenshots are written to `/tmp/orbit-files-*.png`. The PDF fixture is rendered by the real PDF.js worker and its extracted text is checked. Media playback needs real valid files/codecs; generated audio/video fixtures only verify player routing. ODT/PPTX text and archive decompression limits are also checked.
