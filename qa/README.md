@@ -57,3 +57,7 @@ node qa/shared-browser.cjs
 ```
 
 The schema test uses PGlite with Auth/Storage fixtures and verifies author-only writes, shared reads, unpublished-file protection and preservation of private-workspace policies. The browser test uses two isolated Chromium profiles and a mocked service: shared notes/files, owner controls, private-workspace separation, refresh/delete, offline drafts and logout. Serve `docs/` on port 8765 first. Live schema/grants/bucket metadata is also checked after deployment; no existing user content is migrated.
+
+## Theme and zoom
+
+With the local docs server running on port 8765, run `node qa/comfort-browser.cjs`. It checks real Chromium dark/light text contrast, readable initial scale, absence of remote font requests, anchored zoom presets/range/keyboard, per-board view persistence across reloads, browser Ctrl-zoom preservation and mobile/landscape menu geometry. Screenshots are written to `/tmp/orbit-comfort-*.png`.
