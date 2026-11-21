@@ -48,3 +48,12 @@ node qa/file-viewer-browser.cjs
 ```
 
 The test overrides Auth configuration and uses generated fixtures only. It checks visible images/zoom, Word text, Excel sheets, CSV quoting, inert HTML, corrupt-file downloads, PDF/media elements, unsupported formats, profile cleanup and a 375px mobile dialog. Screenshots are written to `/tmp/orbit-files-*.png`. The PDF fixture is rendered by the real PDF.js worker and its extracted text is checked. Media playback needs real valid files/codecs; generated audio/video fixtures only verify player routing. ODT/PPTX text and archive decompression limits are also checked.
+
+## Shared board
+
+```sh
+NODE_PATH=/tmp/orbit-qa/node_modules node qa/shared-schema-check.cjs
+node qa/shared-browser.cjs
+```
+
+The schema test uses PGlite with Auth/Storage fixtures and verifies author-only writes, shared reads, unpublished-file protection and preservation of private-workspace policies. The browser test uses two isolated Chromium profiles and a mocked service: shared notes/files, owner controls, private-workspace separation, refresh/delete, offline drafts and logout. Serve `docs/` on port 8765 first. Live schema/grants/bucket metadata is also checked after deployment; no existing user content is migrated.
