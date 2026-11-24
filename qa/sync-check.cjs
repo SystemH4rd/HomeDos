@@ -22,10 +22,13 @@ function server(){
  x.edit("board().name='Онлайн проєкт';save()");await x.w.OrbitSync.flush();assert.equal(s.rows.get('alice').workspace.boards[0].name,'Онлайн проєкт');assert.match(x.w.document.querySelector('#save-status').textContent,/онлайн/);
  // Attachment upload precedes publishing, and another browser can retrieve it.
  await x.w.OrbitCanvas.putFile('file-1',new x.w.Blob(['private bytes']));x.edit("board().nodes.push({id:'file-node',fileId:'file-1',fileName:'test.txt',type:'file',title:'Файл',x:0,y:0});save()");await x.w.OrbitSync.flush();assert(s.files.has('alice/file-1'));
+ x.edit("deleteNode('file-node')");await x.w.OrbitSync.flush();assert.equal(s.rows.get('alice').workspace.boards[0].trash[0].node.fileId,'file-1');
  const backup=await x.w.OrbitCanvas.exportWorkspaceBackup();assert.equal(backup.files['file-1'].split(',')[1],Buffer.from('private bytes').toString('base64'));
  const restored=mount(),backupText=JSON.stringify(backup);await restored.w.document.querySelector('#import-file').onchange({target:{files:[{size:backupText.length,text:async()=>backupText}],value:'x'}});
- assert.equal(restored.w.OrbitCanvas.getWorkspace().boards.length,2);assert.equal(restored.w.OrbitCanvas.getBoard().name,'Онлайн проєкт (відновлено)');assert(await restored.w.OrbitCanvas.getFile(restored.w.OrbitCanvas.getBoard().nodes.find(n=>n.type==='file').fileId));restored.dom.window.close();
- const y=mount();y.w.OrbitCanvas.activateUser('alice');await y.w.OrbitSync.connect(s.client,'alice');assert.equal(y.w.OrbitCanvas.getBoard().name,'Онлайн проєкт');assert(await y.w.OrbitSync.downloadFile('file-1'));
+ assert.equal(restored.w.OrbitCanvas.getWorkspace().boards.length,2);assert.equal(restored.w.OrbitCanvas.getBoard().name,'Онлайн проєкт (відновлено)');assert(await restored.w.OrbitCanvas.getFile(restored.w.OrbitCanvas.getBoard().trash[0].node.fileId));restored.dom.window.close();
+ const y=mount();y.w.OrbitCanvas.activateUser('alice');await y.w.OrbitSync.connect(s.client,'alice');assert.equal(y.w.OrbitCanvas.getBoard().name,'Онлайн проєкт');assert(await y.w.OrbitSync.downloadFile('file-1'));assert.equal(y.w.OrbitCanvas.getBoard().trash[0].node.fileId,'file-1');
+ x.edit('restoreTrash([0])');await x.w.OrbitSync.flush();assert(x.w.OrbitCanvas.getBoard().nodes.some(n=>n.id==='file-node'));
+
  // Network failure preserves edits; explicit retry publishes them.
  s.fail=true;x.edit("board().name='Без мережі';save()");await x.w.OrbitSync.flush();assert.equal(s.rows.get('alice').workspace.boards[0].name,'Онлайн проєкт');assert.match(x.w.document.querySelector('#save-status').textContent,/недоступна/);s.fail=false;await x.w.OrbitSync.flush();assert.equal(s.rows.get('alice').workspace.boards[0].name,'Без мережі');
  // A stale second device must never overwrite the first device's newer revision.

@@ -11,7 +11,7 @@ function key(c){return 'orbit.cloud.v1.'+c.user;}
 function metadata(c){try{return JSON.parse(localStorage.getItem(key(c)))||{};}catch{return {};}}
 function remember(c,workspace,revision){localStorage.setItem(key(c),JSON.stringify({revision,snapshot:JSON.stringify(workspace)}));}
 function current(c){return context===c;}
-function fileIds(workspace){return [...new Set(workspace.boards.flatMap(b=>b.nodes.map(n=>n.fileId).filter(Boolean)))];}
+function fileIds(workspace){return [...new Set(workspace.boards.flatMap(b=>[...b.nodes,...(b.trash||[]).map(item=>item.node)].map(n=>n.fileId).filter(Boolean)))];}
 function path(c,id){if(typeof id!=='string'||!/^[a-zA-Z0-9_-]{1,128}$/.test(id))throw Error('invalid_file');return c.user+'/'+id;}
 async function pull(c){
  status(c,'Завантаження з хмари…');
