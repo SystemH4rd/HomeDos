@@ -65,3 +65,7 @@ With the local docs server running on port 8765, run `node qa/comfort-browser.cj
 ## Next version and device sessions
 
 Run `node qa/next-version-browser.cjs` with the docs server on port 8765. It checks duplication, undo/redo, clipboard, layout, board copies and mobile tools. Auth uses a mocked provider but the real storage adapter: post-login device choice, session-only reload/new-tab boundaries, remembered reopen, preference changes, logout cleanup and absence of persisted passwords. The actual JavaScript bridge extracted from Android MainActivity is checked with a fixture Blob and Unicode filename. Native Android installation/file pickers need a real device or emulator; see android/README.md.
+
+## Selection, search and editor drafts
+
+Run `node qa/usability-browser.cjs` with the docs server on port 8765. It uses generated local fixtures to check escaped selection labels, direct actions, touch Undo, search scope/type/filename/pagination/keyboard, draft restoration/discard/commit/reload/account isolation, file reselection and double-submit protection, Ctrl+Enter and mobile geometry. No live user content is read or migrated.
