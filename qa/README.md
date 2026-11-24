@@ -61,3 +61,7 @@ The schema test uses PGlite with Auth/Storage fixtures and verifies author-only 
 ## Theme and zoom
 
 With the local docs server running on port 8765, run `node qa/comfort-browser.cjs`. It checks real Chromium dark/light text contrast, readable initial scale, absence of remote font requests, anchored zoom presets/range/keyboard, per-board view persistence across reloads, browser Ctrl-zoom preservation and mobile/landscape menu geometry. Screenshots are written to `/tmp/orbit-comfort-*.png`.
+
+## Next version and device sessions
+
+Run `node qa/next-version-browser.cjs` with the docs server on port 8765. It checks duplication, undo/redo, clipboard, layout, board copies and mobile tools. Auth uses a mocked provider but the real storage adapter: post-login device choice, session-only reload/new-tab boundaries, remembered reopen, preference changes, logout cleanup and absence of persisted passwords. The actual JavaScript bridge extracted from Android MainActivity is checked with a fixture Blob and Unicode filename. Native Android installation/file pickers need a real device or emulator; see android/README.md.
