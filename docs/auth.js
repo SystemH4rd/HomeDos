@@ -69,12 +69,14 @@ function dismiss(){dialog.close();clearPasswords();}
 openButton.onclick=()=>open();$('#auth-close').onclick=$('#auth-dismiss').onclick=dismiss;
 dialog.addEventListener('close',clearPasswords);dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dismiss();}});
 dialog.querySelectorAll('[data-auth-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.authMode));$('#auth-forgot').onclick=()=>setMode('forgot');$('#auth-back').onclick=()=>setMode('login');
+let devicePromptedUser=null;
+function requestDeviceChoice(){if(!currentUser||mode==='reset'||!window.OrbitSession?.ask||devicePromptedUser===currentUser.id)return;devicePromptedUser=currentUser.id;if(dialog.open)dialog.close();window.OrbitSession.ask(currentUser);}
 function applyUser(user,event,ticket=validationTicket){
  scopeQueue=scopeQueue.catch(()=>{}).then(async()=>{
   if(ticket!==validationTicket)return;
   const nextId=user?.id||null;if(nextId!==scopeUserId){await window.OrbitShared?.disconnect();await window.OrbitSync?.disconnect();await api.activateUser(nextId);scopeUserId=nextId;if(nextId){await window.OrbitSync?.connect(client,nextId);await window.OrbitShared?.connect(client,nextId,user?.user_metadata?.display_name||'Учасник');}}
   if(ticket!==validationTicket)return;
-  currentUser=user||null;updateProfile();if(event==='PASSWORD_RECOVERY'){open('reset');return;}if(dialog.open){if(currentUser&&mode!=='reset')mode='account';if(!currentUser&&mode==='account')mode='login';render();}
+  const wasSignedIn=!!currentUser;currentUser=user||null;updateProfile();if(!currentUser)devicePromptedUser=null;if(event==='PASSWORD_RECOVERY'){window.OrbitSession?.close();open('reset');return;}if(dialog.open){if(currentUser&&mode!=='reset')mode='account';if(!currentUser&&mode==='account')mode='login';render();}if(currentUser&&!wasSignedIn&&event==='SIGNED_IN')requestDeviceChoice();
  });
  return scopeQueue;
 }
@@ -93,9 +95,9 @@ $('#auth-form').addEventListener('submit',async e=>{
  try{
   if(mode==='register'){
    const {data,error}=await client.auth.signUp({email,password,options:{data:{display_name:$('#auth-name').value.trim()},emailRedirectTo:callbackUrl()}});if(error)throw error;
-   clearPasswords();if(data?.session){await verifySession(data.session,'SIGNED_IN');if(currentUser){dismiss();api.notify('Обліковий запис створено. Ви увійшли в Orbit.');}}else{setMode('login');message('Перевірте пошту: якщо реєстрація можлива, ви отримаєте лист із посиланням для підтвердження. Після підтвердження поверніться та увійдіть.','success');}
+   clearPasswords();if(data?.session){await verifySession(data.session,'SIGNED_IN');if(currentUser){dismiss();requestDeviceChoice();api.notify('Обліковий запис створено. Ви увійшли в Orbit.');}}else{setMode('login');message('Перевірте пошту: якщо реєстрація можлива, ви отримаєте лист із посиланням для підтвердження. Після підтвердження поверніться та увійдіть.','success');}
   }else if(mode==='login'){
-   const {data,error}=await client.auth.signInWithPassword({email,password});if(error)throw error;await verifySession(data.session,'SIGNED_IN');if(currentUser){dismiss();api.notify('Вхід виконано. Відкрито дошки вашого профілю.');}
+   const {data,error}=await client.auth.signInWithPassword({email,password});if(error)throw error;await verifySession(data.session,'SIGNED_IN');if(currentUser){dismiss();requestDeviceChoice();api.notify('Вхід виконано. Відкрито дошки вашого профілю.');}
   }else if(mode==='forgot'){
    const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:callbackUrl()});if(error)throw error;message('Якщо обліковий запис існує, на цю пошту надійде лист для відновлення пароля. Відкрийте посилання в цьому браузері.','success');
   }else if(mode==='reset'){
@@ -103,7 +105,7 @@ $('#auth-form').addEventListener('submit',async e=>{
   }
  }catch(error){message(describeError(error),'error');}finally{busy=false;render();}
 });
-$('#auth-logout').onclick=async()=>{if(busy||!client)return;busy=true;render();try{const {error}=await client.auth.signOut({scope:'local'});if(error)throw error;++validationTicket;await applyUser(null,'SIGNED_OUT');dismiss();api.notify('Ви вийшли. Відкрито гостьові дошки.');}catch(error){message(describeError(error),'error');}finally{busy=false;render();}};
+$('#auth-logout').onclick=async()=>{if(busy||!client)return;busy=true;render();try{const {error}=await client.auth.signOut({scope:'local'});if(error)throw error;++validationTicket;window.OrbitSession?.close();await applyUser(null,'SIGNED_OUT');dismiss();api.notify('Ви вийшли. Відкрито гостьові дошки.');}catch(error){message(describeError(error),'error');}finally{busy=false;render();}};
 let sdkLoadPromise=null;
 function loadSupabase(){
  if(window.supabase?.createClient)return Promise.resolve();
@@ -125,12 +127,13 @@ async function initialize(){
  try{await loadSupabase();}catch{configurationError='Сервіс облікових записів не завантажився. Оновіть сторінку, щоб спробувати ще раз. Дошкою можна користуватися без входу.';configured=false;render();return;}
  configurationError='';
  try{
-  client=window.supabase.createClient(config.url,config.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce',storageKey:'orbit.supabase.auth.'+new URL(config.url).hostname}});configured=true;
+  const authStorageKey='orbit.supabase.auth.'+new URL(config.url).hostname;const deviceStorage=window.OrbitSession?.configure(authStorageKey);
+  client=window.supabase.createClient(config.url,config.key,{auth:{...(deviceStorage?{storage:deviceStorage}:{}),persistSession:!!deviceStorage,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce',storageKey:authStorageKey}});configured=true;
   client.auth.onAuthStateChange((event,session)=>{if(event==='INITIAL_SESSION')return;setTimeout(()=>verifySession(session,event).catch(()=>{if(dialog.open)message('Не вдалося відновити вхід. Спробуйте увійти ще раз.','error');}),0);});
-  const {data,error}=await client.auth.getSession();if(error)throw error;await verifySession(data?.session,'INITIAL_SESSION');
+  const {data,error}=await client.auth.getSession();if(error)throw error;await verifySession(data?.session,'INITIAL_SESSION');if(currentUser&&!window.OrbitSession?.hasChoice()&&mode!=='reset'&&new URL(location.href).searchParams.get('auth')!=='forgot')requestDeviceChoice();
  }catch(error){message(describeError(error),'error');}
  render();
 }
 window.OrbitAuth={open,isConfigured:()=>configured,getUser:()=>currentUser};
-initialize();
+initialize().then(()=>{if(new URL(location.href).searchParams.get('auth')==='forgot')open('forgot');});
 })();

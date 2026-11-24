@@ -1,3 +1,6 @@
 node_modules/
 .env*
 *.log
+android/build/
+*.jks
+*.keystore
